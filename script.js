@@ -94,6 +94,13 @@ async function routeBerechnen() {
             throw new Error('Adressen konnten nicht gefunden werden. Bitte überprüfe die Schreibweise.');
         }
         
+        // Weiter zu Schritt 2 zuerst, dann Karte initialisieren
+        console.log('Zeige Schritt 2');
+        showStep(2);
+        
+        // Kurze Verzögerung damit DOM aktualisiert wird
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         // Karte initialisieren
         console.log('Initialisiere Karte...');
         initMap();
@@ -101,10 +108,6 @@ async function routeBerechnen() {
         // Route berechnen und anzeigen
         console.log('Berechne Route...');
         await routeAnzeigen(startCoords, endCoords);
-        
-        // Weiter zu Schritt 2
-        console.log('Zeige Schritt 2');
-        showStep(2);
         
     } catch (error) {
         console.error('Fehler:', error);
@@ -162,13 +165,26 @@ function initMap() {
         map.remove();
     }
     
-    // Karte erstellen mit Startpunkt als Zentrum
-    map = L.map('map').setView([startCoords.lat, startCoords.lon], 16);
+    // Karte erstellen - zuerst ohne setView
+    map = L.map('map', {
+        center: [startCoords.lat, startCoords.lon],
+        zoom: 16,
+        zoomControl: true
+    });
     
     // OpenStreetMap Layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19
     }).addTo(map);
+    
+    // WICHTIG: invalidateSize() aufrufen nach kurzer Verzögerung
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+            console.log('Karte Größe aktualisiert');
+        }
+    }, 200);
     
     // Klick-Event für Markierungen
     map.on('click', function(e) {
@@ -377,32 +393,59 @@ function pdfErstellen() {
 
 async function exportKarteAlsBild() {
     return new Promise((resolve) => {
-        const mapElement = document.getElementById('map');
+        const start = startCoords;
+        const end = endCoords;
         
-        // Warte kurz, damit alle Kacheln geladen sind
+        // Berechne Mittelpunkt
+        const midLat = (start.lat + end.lat) / 2;
+        const midLon = (start.lon + end.lon) / 2;
+        
+        // Berechne Zoom basierend auf Distanz
+        const dist = Math.sqrt(Math.pow(end.lat - start.lat, 2) + Math.pow(end.lon - start.lon, 2));
+        let zoom = 16;
+        if (dist > 0.02) zoom = 15;
+        if (dist > 0.05) zoom = 14;
+        if (dist > 0.1) zoom = 13;
+        
+        // Erstelle OpenStreetMap Static Map URL
+        // Format: https://staticmap.openstreetmap.de/staticmap.php?center=lat,lon&zoom=z&size=600x400&markers=...
+        const mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?` +
+            `center=${midLat},${midLon}&` +
+            `zoom=${zoom}&` +
+            `size=800x500&` +
+            `maptype=mapnik&` +
+            `markers=${start.lat},${start.lon},ol-marker-green|${end.lat},${end.lon},ol-marker-red`;
+        
+        // Setze Bild-URL
+        const imgElement = document.getElementById('pdf-karte-bild');
+        imgElement.src = mapUrl;
+        imgElement.style.display = 'block';
+        
+        // Lade-Handling
+        imgElement.onload = function() {
+            console.log('Kartenbild geladen');
+            resolve();
+        };
+        
+        imgElement.onerror = function() {
+            console.error('Kartenbild konnte nicht geladen werden');
+            // Fallback: Text anzeigen
+            imgElement.style.display = 'none';
+            document.getElementById('pdf-karte-container').innerHTML = 
+                '<div style="padding: 40px; text-align: center; background: #f5f5f5; border-radius: 8px;">' +
+                '<p><strong>Schulweg</strong></p>' +
+                '<p>Von: ' + document.getElementById('start-adresse').value + '</p>' +
+                '<p>Nach: ' + document.getElementById('ziel-adresse').value + '</p>' +
+                '</div>';
+            resolve();
+        };
+        
+        // Timeout nach 5 Sekunden
         setTimeout(() => {
-            html2canvas(mapElement, {
-                useCORS: true,
-                allowTaint: true,
-                scale: 2,
-                backgroundColor: null,
-                logging: false
-            }).then(canvas => {
-                const imgData = canvas.toDataURL('image/png');
-                document.getElementById('pdf-karte-bild').src = imgData;
-                resolve();
-            }).catch(error => {
-                console.error('Fehler beim Exportieren der Karte:', error);
-                // Fallback: Text statt Bild
-                document.getElementById('pdf-karte-bild').style.display = 'none';
-                document.getElementById('pdf-karte-container').innerHTML = 
-                    '<p style="padding: 20px; text-align: center; color: #666;">' +
-                    'Karte: Von ' + document.getElementById('start-adresse').value + 
-                    ' nach ' + document.getElementById('ziel-adresse').value + 
-                    '</p>';
-                resolve();
-            });
-        }, 1000); // 1 Sekunde warten für Kacheln
+            if (!imgElement.complete) {
+                imgElement.onerror();
+            }
+        }, 5000);
     });
 }
 
