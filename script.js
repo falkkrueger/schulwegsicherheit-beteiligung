@@ -63,8 +63,13 @@ function showStep(step) {
 }
 
 async function routeBerechnen() {
+    console.log('Route berechnen gestartet');
+    
     const startAdresse = document.getElementById('start-adresse').value.trim();
     const zielAdresse = document.getElementById('ziel-adresse').value.trim();
+    
+    console.log('Start:', startAdresse);
+    console.log('Ziel:', zielAdresse);
     
     if (!startAdresse || !zielAdresse) {
         alert('Bitte gib sowohl Start- als auch Zieladresse ein.');
@@ -77,25 +82,33 @@ async function routeBerechnen() {
     
     try {
         // Geocoding für Start- und Zieladresse
+        console.log('Geocoding Start...');
         startCoords = await geocodeAdresse(startAdresse);
+        console.log('Start coords:', startCoords);
+        
+        console.log('Geocoding Ziel...');
         endCoords = await geocodeAdresse(zielAdresse);
+        console.log('Ziel coords:', endCoords);
         
         if (!startCoords || !endCoords) {
-            throw new Error('Adressen konnten nicht gefunden werden');
+            throw new Error('Adressen konnten nicht gefunden werden. Bitte überprüfe die Schreibweise.');
         }
         
         // Karte initialisieren
+        console.log('Initialisiere Karte...');
         initMap();
         
         // Route berechnen und anzeigen
+        console.log('Berechne Route...');
         await routeAnzeigen(startCoords, endCoords);
         
         // Weiter zu Schritt 2
+        console.log('Zeige Schritt 2');
         showStep(2);
         
     } catch (error) {
         console.error('Fehler:', error);
-        alert('Fehler beim Berechnen der Route: ' + error.message);
+        alert('Fehler: ' + error.message);
     } finally {
         btn.disabled = false;
         btn.textContent = 'Route anzeigen';
@@ -103,27 +116,45 @@ async function routeBerechnen() {
 }
 
 async function geocodeAdresse(adresse) {
+    console.log('Geocoding:', adresse);
+    
     // Füge "Kirchlengern" hinzu, falls nicht vorhanden
+    let searchAdresse = adresse;
     if (!adresse.toLowerCase().includes('kirchlengern') && 
         !adresse.toLowerCase().includes('32105')) {
-        adresse += ', Kirchlengern, Deutschland';
+        searchAdresse += ', Kirchlengern, Deutschland';
     } else if (!adresse.toLowerCase().includes('deutschland')) {
-        adresse += ', Deutschland';
+        searchAdresse += ', Deutschland';
     }
     
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(adresse)}`;
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchAdresse)}`;
     
-    const response = await fetch(url);
-    const data = await response.json();
-    
-    if (data && data.length > 0) {
-        return {
-            lat: parseFloat(data[0].lat),
-            lon: parseFloat(data[0].lon),
-            display_name: data[0].display_name
-        };
+    try {
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'Schulwegsicherheit-App/1.0'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log('Geocoding result:', data);
+        
+        if (data && data.length > 0) {
+            return {
+                lat: parseFloat(data[0].lat),
+                lon: parseFloat(data[0].lon),
+                display_name: data[0].display_name
+            };
+        }
+        return null;
+    } catch (error) {
+        console.error('Geocoding error:', error);
+        throw error;
     }
-    return null;
 }
 
 function initMap() {
@@ -146,6 +177,8 @@ function initMap() {
 }
 
 async function routeAnzeigen(start, end) {
+    console.log('Route anzeigen:', start, end);
+    
     // Start- und Ziel-Marker
     const startIcon = L.divIcon({
         className: 'custom-marker start-marker',
@@ -167,12 +200,23 @@ async function routeAnzeigen(start, end) {
         .addTo(map)
         .bindPopup('Ziel: ' + end.display_name);
     
-    // Route mit OpenRouteService oder OSRM
+    // Route mit OSRM
     try {
         const routeUrl = `https://router.project-osrm.org/route/v1/foot/${start.lon},${start.lat};${end.lon},${end.lat}?overview=full&geometries=geojson`;
+        console.log('Route URL:', routeUrl);
         
-        const response = await fetch(routeUrl);
+        const response = await fetch(routeUrl, {
+            headers: {
+                'User-Agent': 'Schulwegsicherheit-App/1.0'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`OSRM HTTP ${response.status}`);
+        }
+        
         const data = await response.json();
+        console.log('Route data:', data);
         
         if (data.routes && data.routes.length > 0) {
             const coordinates = data.routes[0].geometry.coordinates;
@@ -187,17 +231,28 @@ async function routeAnzeigen(start, end) {
             
             // Karte an Route anpassen
             map.fitBounds(routeLayer.getBounds().pad(0.2));
+            console.log('Route erfolgreich angezeigt');
+        } else {
+            console.warn('Keine Route gefunden');
+            // Fallback: Direkte Linie
+            zeigeFallbackRoute(start, end);
         }
     } catch (error) {
-        console.warn('Routenberechnung fehlgeschlagen, zeige direkte Verbindung');
-        // Fallback: Direkte Linie
-        routeLayer = L.polyline(
-            [[start.lat, start.lon], [end.lat, end.lon]],
-            {color: '#e3000f', weight: 5, opacity: 0.8, dashArray: '10, 10'}
-        ).addTo(map);
-        
-        map.fitBounds(routeLayer.getBounds().pad(0.2));
+        console.error('Routenberechnung fehlgeschlagen:', error);
+        zeigeFallbackRoute(start, end);
     }
+}
+
+function zeigeFallbackRoute(start, end) {
+    console.log('Zeige Fallback-Route');
+    // Fallback: Direkte Linie
+    routeLayer = L.polyline(
+        [[start.lat, start.lon], [end.lat, end.lon]],
+        {color: '#e3000f', weight: 5, opacity: 0.8, dashArray: '10, 10'}
+    ).addTo(map);
+    
+    const bounds = L.latLngBounds([[start.lat, start.lon], [end.lat, end.lon]]);
+    map.fitBounds(bounds.pad(0.2));
 }
 
 function markerHinzufuegen(latlng) {
