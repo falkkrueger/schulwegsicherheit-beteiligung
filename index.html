@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Schulwegsicherheit Kirchlengern - Bürgerbeteiligung</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <span class="spd-logo">SPD</span>
+                <h1>Schulwegsicherheit</h1>
+            </div>
+            <p class="subtitle">Beteiligungsbogen für Kirchlengern</p>
+        </header>
+
+        <main>
+            <form id="beteiligung-form" action="https://formspree.io/f/YOUR_FORM_ID" method="POST">
+                
+                <!-- Abschnitt 1: Persönliche Daten -->
+                <section class="form-section">
+                    <h2>1. Persönliche Angaben</h2>
+                    <div class="form-group">
+                        <label for="name">Name *</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="email">E-Mail *</label>
+                            <input type="email" id="email" name="email" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="telefon">Telefon (optional)</label>
+                            <input type="tel" id="telefon" name="telefon">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="adresse">Wohnadresse *</label>
+                        <input type="text" id="adresse" name="adresse" placeholder="Straße, Hausnummer, PLZ" required>
+                    </div>
+                </section>
+
+                <!-- Abschnitt 2: Schulweg -->
+                <section class="form-section">
+                    <h2>2. Schulweg-Informationen</h2>
+                    <div class="form-group">
+                        <label for="schule">Betroffene Schule *</label>
+                        <select id="schule" name="schule" required>
+                            <option value="">Bitte auswählen...</option>
+                            <option value="grundschule">Grundschule Kirchlengern</option>
+                            <option value="hauptschule">Hauptschule Kirchlengern</option>
+                            <option value="realschule">Realschule Kirchlengern</option>
+                            <option value="gymnasium">Gymnasium Kirchlengern</option>
+                            <option value="other">Andere</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="schulweg-beschreibung">Beschreibung der Route *</label>
+                        <textarea id="schulweg-beschreibung" name="schulweg-beschreibung" rows="3" placeholder="Von wo nach wo führt der Schulweg? Welche Straßen werden genutzt?" required></textarea>
+                    </div>
+                </section>
+
+                <!-- Abschnitt 3: Gefahrenstellen -->
+                <section class="form-section">
+                    <h2>3. Gefahrenstellen & Probleme</h2>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="verkehr">
+                            <span>Starke Verkehrsbelastung</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="tempo">
+                            <span>Zu hohe Geschwindigkeit</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="fussgaenger">
+                            <span>Fehlende Fußgängerüberwege</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="ampel">
+                            <span>Fehlende Ampeln</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="beleuchtung">
+                            <span>Mangelhafte Beleuchtung</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="gehweg">
+                            <span>Schlechter Gehweg-Zustand</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="sicht">
+                            <span>Eingeschränkte Sicht</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="parking">
+                            <span>Illegales Parken</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="radweg">
+                            <span>Fehlende Radwege</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="gefahr[]" value="other">
+                            <span>Sonstiges</span>
+                        </label>
+                    </div>
+                    <div class="form-group">
+                        <label for="standort">Adresse/Ort der Gefahrenstelle *</label>
+                        <input type="text" id="standort" name="standort" placeholder="Straße, Kreuzung, Hausnummer" required>
+                    </div>
+                </section>
+
+                <!-- Abschnitt 4: Detaillierte Beschreibung -->
+                <section class="form-section">
+                    <h2>4. Details zur Situation</h2>
+                    <div class="form-group">
+                        <label for="beschreibung">Beschreiben Sie die Situation *</label>
+                        <textarea id="beschreibung" name="beschreibung" rows="5" placeholder="Was genau ist das Problem? Wann tritt es auf? (Morgens, Nachmittags, Dauerhaft) Gibt es Unfälle oder Beinahe-Unfälle?" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="vorschlag">Ihr Verbesserungsvorschlag (optional)</label>
+                        <textarea id="vorschlag" name="vorschlag" rows="3" placeholder="Welche Maßnahmen könnten helfen?"></textarea>
+                    </div>
+                </section>
+
+                <!-- Abschnitt 5: Fotos -->
+                <section class="form-section">
+                    <h2>5. Fotos (optional)</h2>
+                    <div class="form-group">
+                        <label for="foto-upload" class="file-upload">
+                            <span class="upload-icon">📷</span>
+                            <span>Fotos der Gefahrenstelle hochladen</span>
+                            <input type="file" id="foto-upload" name="fotos" accept="image/*" multiple>
+                        </label>
+                        <p class="hint">Mehrere Fotos möglich. Max. 5MB pro Datei.</p>
+                        <div id="file-preview"></div>
+                    </div>
+                </section>
+
+                <!-- Abschnitt 6: Datenschutz -->
+                <section class="form-section">
+                    <h2>6. Einverständnis</h2>
+                    <div class="form-group checkbox-required">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="datenschutz" required>
+                            <span>Ich stimme der Verarbeitung meiner Daten gemäß der Datenschutzerklärung zu. Meine Angaben werden ausschließlich für die Schulwegsicherheit verwendet.</span>
+                        </label>
+                    </div>
+                    <div class="form-group checkbox-optional">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="kontakt-erlaubt">
+                            <span>Ich bin damit einverstanden, dass die SPD Kirchlengern mich für Rückfragen kontaktiert.</span>
+                        </label>
+                    </div>
+                </section>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn-submit">
+                        <span>Absenden</span>
+                        <svg class="spinner" viewBox="0 0 50 50">
+                            <circle cx="25" cy="25" r="20" fill="none" stroke="currentColor" stroke-width="5"></circle>
+                        </svg>
+                    </button>
+                    <p class="submit-hint">* Pflichtfelder</p>
+                </div>
+
+                <div id="form-status" class="form-status"></div>
+            </form>
+        </main>
+
+        <footer>
+            <div class="footer-content">
+                <p><strong>SPD Kirchlengern</strong></p>
+                <p>Fraktion im Rat der Gemeinde Kirchlengern</p>
+                <p>
+                    <a href="mailto:info@spd-kirchlengern.de">info@spd-kirchlengern.de</a>
+                </p>
+                <div class="footer-links">
+                    <a href="https://spd-kirchlengern.de" target="_blank">Zur SPD-Website</a>
+                    <span>•</span>
+                    <a href="#datenschutz">Datenschutz</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
