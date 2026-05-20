@@ -5,6 +5,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const submitButton = form?.querySelector('.btn-submit');
     const formStatus = document.getElementById('form-status');
     
+    // GitHub Repository Info
+    const GITHUB_OWNER = 'falkkrueger';
+    const GITHUB_REPO = 'schulwegsicherheit-beteiligung';
+    
     // File upload preview
     if (fileInput && filePreview) {
         const selectedFiles = new Map();
@@ -49,7 +53,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // Form submission
+    // Form submission - Erstellt direkt ein GitHub Issue
     if (form) {
         form.addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -61,24 +65,59 @@ document.addEventListener('DOMContentLoaded', function() {
             submitButton.classList.add('loading');
             
             try {
+                // Sammle Formulardaten
                 const formData = new FormData(form);
                 
-                // Log form data for debugging
-                console.log('Sending form data...');
-                
-                const response = await fetch(form.action, {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'Accept': 'application/json'
-                    }
+                // Sammle Checkbox-Werte
+                const gefahren = [];
+                form.querySelectorAll('input[name="gefahr[]"]:checked').forEach(cb => {
+                    gefahren.push(cb.nextElementSibling.textContent.trim());
                 });
                 
-                if (response.ok) {
-                    window.location.href = 'danke.html';
-                } else {
-                    throw new Error('Form submission failed');
-                }
+                // Erstelle Issue-Text
+                const issueTitle = `🚨 Schulwegsicherheit: ${formData.get('standort')}`;
+                const issueBody = `## Neue Meldung zur Schulwegsicherheit
+
+**Name:** ${formData.get('name')}
+**E-Mail:** ${formData.get('email')}
+**Telefon:** ${formData.get('telefon') || 'Nicht angegeben'}
+**Adresse:** ${formData.get('adresse')}
+
+### Schulweg
+**Schule:** ${formData.get('schule')}
+**Route:** ${formData.get('schulweg-beschreibung')}
+
+### Gefahrenstelle
+**Standort:** ${formData.get('standort')}
+
+**Gemeldete Gefahren:**
+${gefahren.map(g => `- ${g}`).join('\n') || '- Keine spezifischen Gefahren angegeben'}
+
+### Details
+${formData.get('beschreibung')}
+
+### Verbesserungsvorschlag
+${formData.get('vorschlag') || 'Kein Vorschlag'}
+
+---
+*Automatisch erstellt via Beteiligungsbogen*`;
+
+                // Öffne GitHub Issues mit vorausgefülltem Formular
+                const githubUrl = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/issues/new?` + 
+                    `title=${encodeURIComponent(issueTitle)}&` +
+                    `body=${encodeURIComponent(issueBody)}&` +
+                    `labels=${encodeURIComponent('schulwegsicherheit,bürgermeldung')}`;
+                
+                // Speichere Daten im localStorage für den Fall, dass der Tab geschlossen wird
+                localStorage.setItem('beteiligung_daten', JSON.stringify({
+                    issueTitle,
+                    issueBody,
+                    timestamp: new Date().toISOString()
+                }));
+                
+                // Weiterleitung zu GitHub
+                window.location.href = githubUrl;
+                
             } catch (error) {
                 console.error('Error:', error);
                 
@@ -86,19 +125,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     formStatus.className = 'form-status error';
                     formStatus.innerHTML = `
                         <strong>Ein Fehler ist aufgetreten.</strong><br>
-                        Bitte versuchen Sie es später erneut oder kontaktieren Sie uns unter info@spd-kirchlengern.de
+                        Bitte versuchen Sie es später erneut.
                     `;
                 }
                 
-                // Redirect to error page after a delay
-                setTimeout(() => {
-                    window.location.href = 'fehler.html';
-                }, 3000);
-            } finally {
                 submitButton.disabled = false;
                 submitButton.classList.remove('loading');
             }
         });
+    }
+    
+    // Prüfe, ob wir von GitHub zurückkommen
+    if (window.location.search.includes('success')) {
+        // Zeige Erfolgsmeldung
+        window.location.href = 'danke.html';
     }
     
     // Auto-resize textareas

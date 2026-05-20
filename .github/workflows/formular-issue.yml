@@ -1,0 +1,85 @@
+name: Formular zu Issue
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Name'
+        required: true
+      email:
+        description: 'E-Mail'
+        required: true
+      adresse:
+        description: 'Wohnadresse'
+        required: true
+      schule:
+        description: 'Schule'
+        required: true
+      schulweg:
+        description: 'Schulweg Beschreibung'
+        required: true
+      gefahren:
+        description: 'Gefahren'
+        required: true
+      standort:
+        description: 'Gefahrenstelle'
+        required: true
+      beschreibung:
+        description: 'Details'
+        required: true
+      vorschlag:
+        description: 'Verbesserungsvorschlag'
+        required: false
+        default: 'Kein Vorschlag'
+      telefon:
+        description: 'Telefon'
+        required: false
+        default: 'Nicht angegeben'
+
+jobs:
+  create-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create Issue
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const gefahrenList = '${{ github.event.inputs.gefahren }}'.split(',').map(g => `- ${g.trim()}`).join('\n');
+            
+            const issueBody = `## Neue Meldung zur Schulwegsicherheit
+            
+            **Name:** ${{ github.event.inputs.name }}
+            **E-Mail:** ${{ github.event.inputs.email }}
+            **Telefon:** ${{ github.event.inputs.telefon }}
+            **Adresse:** ${{ github.event.inputs.adresse }}
+            
+            ### Schulweg
+            **Schule:** ${{ github.event.inputs.schule }}
+            **Route:** ${{ github.event.inputs.schulweg }}
+            
+            ### Gefahrenstelle
+            **Standort:** ${{ github.event.inputs.standort }}
+            
+            **Gemeldete Gefahren:**
+            ${gefahrenList}
+            
+            ### Details
+            ${{ github.event.inputs.beschreibung }}
+            
+            ### Verbesserungsvorschlag
+            ${{ github.event.inputs.vorschlag }}
+            
+            ---
+            *Automatisch erstellt via Beteiligungsbogen*`
+            
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Schulwegsicherheit: ${{ github.event.inputs.standort }}`,
+              body: issueBody,
+              labels: ['schulwegsicherheit', 'bürgermeldung']
+            });
