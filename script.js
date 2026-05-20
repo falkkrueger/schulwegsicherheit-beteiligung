@@ -401,83 +401,161 @@ async function exportKarteAlsBild() {
             return;
         }
         
-        // Berechne Mittelpunkt und Zoom
-        const midLat = (start.lat + end.lat) / 2;
-        const midLon = (start.lon + end.lon) / 2;
+        // Canvas-basierte Karte erstellen
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const width = 800;
+        const height = 500;
+        canvas.width = width;
+        canvas.height = height;
         
-        // Berechne Zoom basierend auf Distanz
-        const dist = Math.sqrt(Math.pow(end.lat - start.lat, 2) + Math.pow(end.lon - start.lon, 2));
-        let zoom = 16;
-        if (dist > 0.02) zoom = 15;
-        if (dist > 0.05) zoom = 14;
-        if (dist > 0.1) zoom = 13;
+        // Berechne Bounding Box mit Padding
+        const padding = 0.002; // ca. 200m
+        const minLat = Math.min(start.lat, end.lat) - padding;
+        const maxLat = Math.max(start.lat, end.lat) + padding;
+        const minLon = Math.min(start.lon, end.lon) - padding;
+        const maxLon = Math.max(start.lon, end.lon) + padding;
         
-        // Versuche verschiedene Static Map Services
-        const services = [
-            // MapQuest Open (kein API-Key nötig für niedrige Nutzung)
-            `https://www.mapquestapi.com/staticmap/v5/map?` +
-            `key=YOUR_KEY&center=${midLat},${midLon}&zoom=${zoom}&size=800,500&` +
-            `locations=${start.lat},${start.lon}|${end.lat},${end.lon}`,
-            
-            // OpenStreetMap.de Static (einfacher)
-            `https://staticmap.openstreetmap.de/staticmap.php?` +
-            `center=${midLat},${midLon}&zoom=${zoom}&size=800x500&` +
-            `markers=${start.lat},${start.lon},ol-marker-green|${end.lat},${end.lon},ol-marker-red`,
-            
-            // Geoapify (kostenlos bis 3000/Tag)
-            `https://maps.geoapify.com/v1/staticmap?style=osm-carto&` +
-            `width=800&height=500&center=lonlat:${midLon},${midLat}&zoom=${zoom}&` +
-            `marker=lonlat:${start.lon},${start.lat};color:#00aa00|lonlat:${end.lon},${end.lat};color:#aa0000`
-        ];
+        // Skalierungsfaktoren
+        const latRange = maxLat - minLat;
+        const lonRange = maxLon - minLon;
+        const scaleX = width / lonRange;
+        const scaleY = height / latRange;
+        const scale = Math.min(scaleX, scaleY);
         
-        const imgElement = document.getElementById('pdf-karte-bild');
-        let currentService = 0;
-        
-        function tryNextService() {
-            if (currentService >= services.length) {
-                // Alle Services fehlgeschlagen - Fallback
-                console.error('Kein Karten-Service verfügbar');
-                imgElement.style.display = 'none';
-                document.getElementById('pdf-karte-container').innerHTML = 
-                    '<div style="padding: 40px; text-align: center; background: #f5f5f5; border-radius: 8px;">' +
-                    '<p><strong>🗺️ Schulweg</strong></p>' +
-                    '<p style="margin-top: 15px;"><b>Von:</b> ' + document.getElementById('start-adresse').value + '</p>' +
-                    '<p><b>Nach:</b> ' + document.getElementById('ziel-adresse').value + '</p>' +
-                    '<p style="margin-top: 15px; font-size: 0.9em; color: #666;">' +
-                    'Koordinaten: ' + start.lat.toFixed(5) + ', ' + start.lon.toFixed(5) + ' → ' +
-                    end.lat.toFixed(5) + ', ' + end.lon.toFixed(5) + '</p>' +
-                    '</div>';
-                resolve();
-                return;
-            }
-            
-            const url = services[currentService];
-            console.log('Versuche Karten-Service', currentService + 1, ':', url);
-            
-            imgElement.src = url;
-            imgElement.style.display = 'block';
-            
-            imgElement.onload = function() {
-                console.log('Kartenbild erfolgreich geladen von Service', currentService + 1);
-                resolve();
-            };
-            
-            imgElement.onerror = function() {
-                console.log('Service', currentService + 1, 'fehlgeschlagen');
-                currentService++;
-                tryNextService();
-            };
+        // Hilfsfunktion: Koordinaten zu Pixeln
+        function coordToPixel(lat, lon) {
+            const x = (lon - minLon) * scale;
+            const y = height - ((lat - minLat) * scale); // Y invertieren
+            return { x, y };
         }
         
-        tryNextService();
+        // Lade OpenStreetMap Tiles als Hintergrund
+        const tileSize = 256;
+        const zoom = Math.floor(Math.log2(Math.max(width, height) / tileSize / Math.min(latRange, lonRange) * 111320)) + 1;
+        const clampedZoom = Math.min(Math.max(zoom, 15), 18);
         
-        // Timeout nach 10 Sekunden
-        setTimeout(() => {
-            if (!imgElement.complete || imgElement.naturalWidth === 0) {
-                console.error('Timeout beim Laden der Karte');
-                imgElement.onerror();
+        // Berechne Tile-Koordinaten
+        function latLonToTile(lat, lon, z) {
+            const x = Math.floor((lon + 180) / 360 * Math.pow(2, z));
+            const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
+            return { x, y };
+        }
+        
+        const startTile = latLonToTile(minLat, minLon, clampedZoom);
+        const endTile = latLonToTile(maxLat, maxLon, clampedZoom);
+        
+        // Lade Tiles
+        const tilesToLoad = [];
+        for (let x = startTile.x; x <= endTile.x; x++) {
+            for (let y = startTile.y; y <= endTile.y; y++) {
+                tilesToLoad.push({ x, y, z: clampedZoom });
             }
-        }, 10000);
+        }
+        
+        let loadedTiles = 0;
+        const totalTiles = tilesToLoad.length;
+        
+        // Zeichne zuerst Hintergrund
+        ctx.fillStyle = '#e8f4f8';
+        ctx.fillRect(0, 0, width, height);
+        
+        // Zeichne Straßen (einfache Darstellung)
+        const startPixel = coordToPixel(start.lat, start.lon);
+        const endPixel = coordToPixel(end.lat, end.lon);
+        
+        // Zeichne Verbindungslinie (Route)
+        ctx.beginPath();
+        ctx.moveTo(startPixel.x, startPixel.y);
+        ctx.lineTo(endPixel.x, endPixel.y);
+        ctx.strokeStyle = '#e3000f';
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.moveTo(startPixel.x, startPixel.y);
+        ctx.lineTo(endPixel.x, endPixel.y);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Zeichne Markierungen
+        // Start (Haus)
+        ctx.fillStyle = '#00aa00';
+        ctx.beginPath();
+        ctx.arc(startPixel.x, startPixel.y, 12, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('🏠', startPixel.x, startPixel.y);
+        
+        // Ende (Schule)
+        ctx.fillStyle = '#e3000f';
+        ctx.beginPath();
+        ctx.arc(endPixel.x, endPixel.y, 12, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText('🏫', endPixel.x, endPixel.y);
+        
+        // Zeichne Gefahrenstellen-Markierungen
+        markers.forEach((m, index) => {
+            const mPixel = coordToPixel(m.lat, m.lng);
+            if (mPixel.x >= 0 && mPixel.x <= width && mPixel.y >= 0 && mPixel.y <= height) {
+                ctx.fillStyle = '#ff6600';
+                ctx.beginPath();
+                ctx.arc(mPixel.x, mPixel.y, 10, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px Arial';
+                ctx.fillText((index + 1).toString(), mPixel.x, mPixel.y);
+            }
+        });
+        
+        // Zeichne Legende
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(10, height - 90, 180, 80);
+        ctx.strokeStyle = '#ddd';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(10, height - 90, 180, 80);
+        
+        ctx.fillStyle = '#333';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText('Legende:', 20, height - 70);
+        
+        // Legende Einträge
+        ctx.fillStyle = '#00aa00';
+        ctx.beginPath();
+        ctx.arc(30, height - 50, 8, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#333';
+        ctx.fillText('Start (Zuhause)', 45, height - 46);
+        
+        ctx.fillStyle = '#e3000f';
+        ctx.beginPath();
+        ctx.arc(30, height - 30, 8, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#333';
+        ctx.fillText('Ziel (Schule)', 45, height - 26);
+        
+        // Konvertiere zu Bild
+        const imgElement = document.getElementById('pdf-karte-bild');
+        imgElement.src = canvas.toDataURL('image/png');
+        imgElement.style.display = 'block';
+        
+        console.log('Karte als Canvas erstellt');
+        resolve();
     });
 }
 
