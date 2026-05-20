@@ -416,6 +416,23 @@ textarea {
     margin-bottom: 10px;
 }
 
+.pdf-kontakt {
+    margin: 20px 0;
+    padding: 15px;
+    background: #e8f4f8;
+    border-radius: 6px;
+    border-left: 4px solid #17a2b8;
+}
+
+.pdf-kontakt h4 {
+    color: #0c5460;
+    margin-bottom: 10px;
+}
+
+.pdf-kontakt p {
+    margin-bottom: 5px;
+}
+
 .pdf-footer {
     margin-top: 30px;
     padding-top: 20px;

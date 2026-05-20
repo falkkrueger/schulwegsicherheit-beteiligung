@@ -358,13 +358,32 @@ function updateMarkierungenListe() {
 
 function pdfErstellen() {
     // Daten sammeln
-    const name = document.getElementById('name').value;
-    const email = document.getElementById('email').value;
-    const notizen = document.getElementById('notizen').value;
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const notizen = document.getElementById('notizen').value.trim();
     
     // PDF-Daten füllen
     document.getElementById('pdf-start').textContent = document.getElementById('start-adresse').value;
     document.getElementById('pdf-ziel').textContent = document.getElementById('ziel-adresse').value;
+    
+    // Kontaktdaten ins PDF einfügen
+    const kontaktSection = document.getElementById('pdf-kontakt-section');
+    const kontaktInhalt = document.getElementById('pdf-kontakt-inhalt');
+    
+    let kontaktHtml = '';
+    if (name) {
+        kontaktHtml += `<p><strong>Name:</strong> ${name}</p>`;
+    }
+    if (email) {
+        kontaktHtml += `<p><strong>E-Mail:</strong> ${email}</p>`;
+    }
+    
+    if (kontaktHtml) {
+        kontaktInhalt.innerHTML = kontaktHtml;
+        kontaktSection.style.display = 'block';
+    } else {
+        kontaktSection.style.display = 'none';
+    }
     
     // Markierungen ins PDF übertragen
     const pdfMarkierungen = document.getElementById('pdf-markierungen-liste');
@@ -380,9 +399,12 @@ function pdfErstellen() {
     }
     
     // Notizen
+    const notizenSection = document.getElementById('pdf-notizen-section');
     if (notizen) {
         document.getElementById('pdf-notizen-text').textContent = notizen;
-        document.getElementById('pdf-notizen-section').style.display = 'block';
+        notizenSection.style.display = 'block';
+    } else {
+        notizenSection.style.display = 'none';
     }
     
     // Karte als Bild exportieren
