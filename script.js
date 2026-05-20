@@ -162,8 +162,8 @@ function initMap() {
         map.remove();
     }
     
-    // Karte erstellen
-    map = L.map('map').setView([startCoords.lat, startCoords.lon], 13);
+    // Karte erstellen mit Startpunkt als Zentrum
+    map = L.map('map').setView([startCoords.lat, startCoords.lon], 16);
     
     // OpenStreetMap Layer
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -251,8 +251,9 @@ function zeigeFallbackRoute(start, end) {
         {color: '#e3000f', weight: 5, opacity: 0.8, dashArray: '10, 10'}
     ).addTo(map);
     
+    // Berechne Bounds mit Padding
     const bounds = L.latLngBounds([[start.lat, start.lon], [end.lat, end.lon]]);
-    map.fitBounds(bounds.pad(0.2));
+    map.fitBounds(bounds, {padding: [50, 50], maxZoom: 17});
 }
 
 function markerHinzufuegen(latlng) {
@@ -376,23 +377,32 @@ function pdfErstellen() {
 
 async function exportKarteAlsBild() {
     return new Promise((resolve) => {
-        // Temporär das Leaflet-UI ausblenden
         const mapElement = document.getElementById('map');
         
-        html2canvas(mapElement, {
-            useCORS: true,
-            allowTaint: true,
-            scale: 2
-        }).then(canvas => {
-            const imgData = canvas.toDataURL('image/png');
-            document.getElementById('pdf-karte-bild').src = imgData;
-            resolve();
-        }).catch(error => {
-            console.error('Fehler beim Exportieren der Karte:', error);
-            document.getElementById('pdf-karte-bild').src = '';
-            document.getElementById('pdf-karte-bild').alt = 'Karte konnte nicht geladen werden';
-            resolve();
-        });
+        // Warte kurz, damit alle Kacheln geladen sind
+        setTimeout(() => {
+            html2canvas(mapElement, {
+                useCORS: true,
+                allowTaint: true,
+                scale: 2,
+                backgroundColor: null,
+                logging: false
+            }).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                document.getElementById('pdf-karte-bild').src = imgData;
+                resolve();
+            }).catch(error => {
+                console.error('Fehler beim Exportieren der Karte:', error);
+                // Fallback: Text statt Bild
+                document.getElementById('pdf-karte-bild').style.display = 'none';
+                document.getElementById('pdf-karte-container').innerHTML = 
+                    '<p style="padding: 20px; text-align: center; color: #666;">' +
+                    'Karte: Von ' + document.getElementById('start-adresse').value + 
+                    ' nach ' + document.getElementById('ziel-adresse').value + 
+                    '</p>';
+                resolve();
+            });
+        }, 1000); // 1 Sekunde warten für Kacheln
     });
 }
 
