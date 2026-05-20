@@ -392,7 +392,7 @@ function pdfErstellen() {
 }
 
 async function exportKarteAlsBild() {
-    return new Promise((resolve) => {
+    return new Promise(async (resolve) => {
         const start = startCoords;
         const end = endCoords;
         
@@ -401,7 +401,7 @@ async function exportKarteAlsBild() {
             return;
         }
         
-        // Canvas-basierte Karte erstellen
+        // Canvas erstellen
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         const width = 800;
@@ -409,62 +409,101 @@ async function exportKarteAlsBild() {
         canvas.width = width;
         canvas.height = height;
         
-        // Berechne Bounding Box mit Padding
-        const padding = 0.002; // ca. 200m
+        // Berechne Bounding Box
+        const padding = 0.002;
         const minLat = Math.min(start.lat, end.lat) - padding;
         const maxLat = Math.max(start.lat, end.lat) + padding;
         const minLon = Math.min(start.lon, end.lon) - padding;
         const maxLon = Math.max(start.lon, end.lon) + padding;
         
-        // Skalierungsfaktoren
-        const latRange = maxLat - minLat;
-        const lonRange = maxLon - minLon;
-        const scaleX = width / lonRange;
-        const scaleY = height / latRange;
-        const scale = Math.min(scaleX, scaleY);
+        // Berechne Zoom-Level
+        const latDiff = maxLat - minLat;
+        const lonDiff = maxLon - minLon;
+        const maxDiff = Math.max(latDiff, lonDiff);
+        let zoom = 16;
+        if (maxDiff > 0.005) zoom = 15;
+        if (maxDiff > 0.01) zoom = 14;
+        if (maxDiff > 0.02) zoom = 13;
+        if (maxDiff > 0.05) zoom = 12;
         
-        // Hilfsfunktion: Koordinaten zu Pixeln
-        function coordToPixel(lat, lon) {
-            const x = (lon - minLon) * scale;
-            const y = height - ((lat - minLat) * scale); // Y invertieren
-            return { x, y };
-        }
-        
-        // Lade OpenStreetMap Tiles als Hintergrund
-        const tileSize = 256;
-        const zoom = Math.floor(Math.log2(Math.max(width, height) / tileSize / Math.min(latRange, lonRange) * 111320)) + 1;
-        const clampedZoom = Math.min(Math.max(zoom, 15), 18);
-        
-        // Berechne Tile-Koordinaten
+        // Konvertiere zu Tile-Koordinaten
         function latLonToTile(lat, lon, z) {
             const x = Math.floor((lon + 180) / 360 * Math.pow(2, z));
             const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, z));
             return { x, y };
         }
         
-        const startTile = latLonToTile(minLat, minLon, clampedZoom);
-        const endTile = latLonToTile(maxLat, maxLon, clampedZoom);
+        // Berechne Pixel-Positionen
+        const centerLat = (minLat + maxLat) / 2;
+        const centerLon = (minLon + maxLon) / 2;
+        const centerTile = latLonToTile(centerLat, centerLon, zoom);
         
-        // Lade Tiles
-        const tilesToLoad = [];
-        for (let x = startTile.x; x <= endTile.x; x++) {
-            for (let y = startTile.y; y <= endTile.y; y++) {
-                tilesToLoad.push({ x, y, z: clampedZoom });
+        // Tile-Größe
+        const tileSize = 256;
+        
+        // Berechne wie viele Tiles wir brauchen
+        const tilesX = Math.ceil(width / tileSize) + 1;
+        const tilesY = Math.ceil(height / tileSize) + 1;
+        
+        // Start-Offset für zentrierte Darstellung
+        const startX = centerTile.x - Math.floor(tilesX / 2);
+        const startY = centerTile.y - Math.floor(tilesY / 2);
+        
+        // Lade alle Tiles
+        const tilePromises = [];
+        
+        for (let x = 0; x < tilesX; x++) {
+            for (let y = 0; y < tilesY; y++) {
+                const tileX = startX + x;
+                const tileY = startY + y;
+                const tileUrl = `https://tile.openstreetmap.org/${zoom}/${tileX}/${tileY}.png`;
+                
+                tilePromises.push(new Promise((resolveTile) => {
+                    const img = new Image();
+                    img.crossOrigin = 'anonymous';
+                    img.onload = () => {
+                        const drawX = x * tileSize + (width - tilesX * tileSize) / 2;
+                        const drawY = y * tileSize + (height - tilesY * tileSize) / 2;
+                        ctx.drawImage(img, drawX, drawY, tileSize, tileSize);
+                        resolveTile();
+                    };
+                    img.onerror = () => {
+                        // Bei Fehler: grauen Hintergrund zeichnen
+                        const drawX = x * tileSize + (width - tilesX * tileSize) / 2;
+                        const drawY = y * tileSize + (height - tilesY * tileSize) / 2;
+                        ctx.fillStyle = '#e8e8e8';
+                        ctx.fillRect(drawX, drawY, tileSize, tileSize);
+                        resolveTile();
+                    };
+                    img.src = tileUrl;
+                }));
             }
         }
         
-        let loadedTiles = 0;
-        const totalTiles = tilesToLoad.length;
+        // Warte auf alle Tiles
+        await Promise.all(tilePromises);
         
-        // Zeichne zuerst Hintergrund
-        ctx.fillStyle = '#e8f4f8';
-        ctx.fillRect(0, 0, width, height);
+        // Hilfsfunktion: Koordinaten zu Pixeln
+        function coordToPixel(lat, lon) {
+            const x = (lon - minLon) / (maxLon - minLon) * width;
+            const y = height - ((lat - minLat) / (maxLat - minLat) * height);
+            return { x, y };
+        }
         
-        // Zeichne Straßen (einfache Darstellung)
+        // Zeichne Route (durchgezogene Linie)
         const startPixel = coordToPixel(start.lat, start.lon);
         const endPixel = coordToPixel(end.lat, end.lon);
         
-        // Zeichne Verbindungslinie (Route)
+        // Route als Schatten (breiter)
+        ctx.beginPath();
+        ctx.moveTo(startPixel.x, startPixel.y);
+        ctx.lineTo(endPixel.x, endPixel.y);
+        ctx.strokeStyle = 'rgba(227, 0, 15, 0.5)';
+        ctx.lineWidth = 12;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        
+        // Route Hauptlinie
         ctx.beginPath();
         ctx.moveTo(startPixel.x, startPixel.y);
         ctx.lineTo(endPixel.x, endPixel.y);
@@ -472,32 +511,25 @@ async function exportKarteAlsBild() {
         ctx.lineWidth = 6;
         ctx.stroke();
         
-        ctx.beginPath();
-        ctx.moveTo(startPixel.x, startPixel.y);
-        ctx.lineTo(endPixel.x, endPixel.y);
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
         // Zeichne Markierungen
-        // Start (Haus)
+        // Start (grün mit Haus-Icon)
         ctx.fillStyle = '#00aa00';
         ctx.beginPath();
-        ctx.arc(startPixel.x, startPixel.y, 12, 0, 2 * Math.PI);
+        ctx.arc(startPixel.x, startPixel.y, 14, 0, 2 * Math.PI);
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 3;
         ctx.stroke();
         ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 14px Arial';
+        ctx.font = 'bold 16px Arial';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🏠', startPixel.x, startPixel.y);
         
-        // Ende (Schule)
+        // Ende (rot mit Schule-Icon)
         ctx.fillStyle = '#e3000f';
         ctx.beginPath();
-        ctx.arc(endPixel.x, endPixel.y, 12, 0, 2 * Math.PI);
+        ctx.arc(endPixel.x, endPixel.y, 14, 0, 2 * Math.PI);
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 3;
@@ -509,52 +541,65 @@ async function exportKarteAlsBild() {
         markers.forEach((m, index) => {
             const mPixel = coordToPixel(m.lat, m.lng);
             if (mPixel.x >= 0 && mPixel.x <= width && mPixel.y >= 0 && mPixel.y <= height) {
+                // Orangener Kreis
                 ctx.fillStyle = '#ff6600';
                 ctx.beginPath();
-                ctx.arc(mPixel.x, mPixel.y, 10, 0, 2 * Math.PI);
+                ctx.arc(mPixel.x, mPixel.y, 12, 0, 2 * Math.PI);
                 ctx.fill();
                 ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 3;
                 ctx.stroke();
+                
+                // Nummer
                 ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 12px Arial';
+                ctx.font = 'bold 14px Arial';
                 ctx.fillText((index + 1).toString(), mPixel.x, mPixel.y);
             }
         });
         
         // Zeichne Legende
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillRect(10, height - 90, 180, 80);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.fillRect(10, height - 100, 200, 90);
         ctx.strokeStyle = '#ddd';
         ctx.lineWidth = 1;
-        ctx.strokeRect(10, height - 90, 180, 80);
+        ctx.strokeRect(10, height - 100, 200, 90);
         
         ctx.fillStyle = '#333';
-        ctx.font = '12px Arial';
+        ctx.font = 'bold 13px Arial';
         ctx.textAlign = 'left';
-        ctx.fillText('Legende:', 20, height - 70);
+        ctx.fillText('Legende:', 20, height - 80);
         
-        // Legende Einträge
+        // Start
         ctx.fillStyle = '#00aa00';
         ctx.beginPath();
-        ctx.arc(30, height - 50, 8, 0, 2 * Math.PI);
+        ctx.arc(35, height - 60, 8, 0, 2 * Math.PI);
         ctx.fill();
         ctx.fillStyle = '#333';
-        ctx.fillText('Start (Zuhause)', 45, height - 46);
+        ctx.font = '12px Arial';
+        ctx.fillText('Start (Zuhause)', 50, height - 56);
         
+        // Ziel
         ctx.fillStyle = '#e3000f';
         ctx.beginPath();
-        ctx.arc(30, height - 30, 8, 0, 2 * Math.PI);
+        ctx.arc(35, height - 40, 8, 0, 2 * Math.PI);
         ctx.fill();
         ctx.fillStyle = '#333';
-        ctx.fillText('Ziel (Schule)', 45, height - 26);
+        ctx.fillText('Ziel (Schule)', 50, height - 36);
+        
+        // Gefahren
+        ctx.fillStyle = '#ff6600';
+        ctx.beginPath();
+        ctx.arc(35, height - 20, 8, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.fillStyle = '#333';
+        ctx.fillText('Gefahrenstelle', 50, height - 16);
         
         // Konvertiere zu Bild
         const imgElement = document.getElementById('pdf-karte-bild');
         imgElement.src = canvas.toDataURL('image/png');
         imgElement.style.display = 'block';
         
-        console.log('Karte als Canvas erstellt');
+        console.log('Karte mit OpenStreetMap Tiles erstellt');
         resolve();
     });
 }
