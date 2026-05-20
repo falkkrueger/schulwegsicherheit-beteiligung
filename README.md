@@ -1,80 +1,69 @@
-# Schulwegsicherheit Beteiligungsbogen
+# Schulwegsicherheit - Interaktive Beteiligung
 
-Interaktiver Bürgerbeteiligungsbogen für die SPD Kirchlengern zur Erfassung von Gefahrenstellen und Verbesserungsvorschlägen im Bereich Schulwegsicherheit.
+Ein webbasiertes Tool für die SPD Kirchlengern zur Erfassung von Gefahrenstellen auf Schulwegen. Kinder können ihre Route visualisieren und Gefahren direkt auf einer Karte markieren.
 
 ## Features
 
-- ✅ Modernes, responsives Design
-- ✅ Keine API-Keys oder Backend nötig
-- ✅ Formspree-Integration für E-Mail-Versand
-- ✅ Datei-Upload für Fotos
-- ✅ Datenschutz-Checkbox
-- ✅ Erfolgs-/Fehlerseiten
+- ✅ **Adress-Suche:** Start (Zuhause) und Ziel (Schule) eingeben
+- ✅ **Routenberechnung:** Automatische Fußweg-Berechnung via OpenStreetMap
+- ✅ **Interaktive Karte:** Klicken zum Markieren von Gefahrenstellen
+- ✅ **Beschreibungen:** Zu jeder Markierung Notizen hinzufügen
+- ✅ **PDF-Export:** Karte mit Markierungen als druckbares PDF
+- ✅ **Mobile-optimiert:** Funktioniert auf Smartphones und Tablets
 
 ## Live-Demo
 
 https://falkkrueger.github.io/schulwegsicherheit-beteiligung
 
+## Anleitung für Eltern & Kinder
+
+### So funktioniert's:
+
+1. **Adressen eingeben**
+   - Start: Deine Hausadresse
+   - Ziel: Schuladresse
+   - Auf "Route anzeigen" klicken
+
+2. **Gefahren markieren**
+   - Auf die Karte klicken, wo Gefahren bestehen
+   - Beschreibung hinzufügen (z.B. "Kein Zebrastreifen")
+   - Marker können verschoben werden
+
+3. **PDF erstellen**
+   - Name und E-Mail optional angeben
+   - Weitere Notizen hinzufügen
+   - PDF generieren und ausdrucken
+
+4. **Einreichen**
+   - Ausgedrucktes PDF dem Kind für die Schule mitgeben
+   - Oder digital an SPD Kirchlengern senden
+
+## Technische Umsetzung
+
+### Verwendete Dienste:
+
+- **Karten:** OpenStreetMap via Leaflet.js
+- **Geocoding:** Nominatim (OpenStreetMap)
+- **Routenberechnung:** OSRM (Open Source Routing Machine)
+- **PDF-Export:** html2canvas
+
+### Keine API-Keys nötig!
+
+Alle verwendeten Dienste sind kostenlos und Open Source.
+
 ## Technologie
 
 - **Frontend:** HTML5, CSS3, Vanilla JavaScript
-- **Formular-Service:** Formspree.io (kostenlos bis 50 Einreichungen/Monat)
+- **Karten-Bibliothek:** Leaflet.js 1.9.4
+- **PDF-Export:** html2canvas 1.4.1
 - **Hosting:** GitHub Pages
-
-## Einrichtung
-
-### 1. Formspree einrichten
-
-1. Auf [formspree.io](https://formspree.io) registrieren
-2. Neues Formular erstellen
-3. Endpoint-URL kopieren (z.B. `https://formspree.io/f/xyxxx`)
-4. In `index.html` Zeile 31 austauschen:
-   ```html
-   action="https://formspree.io/f/DEINE_FORM_ID"
-   ```
-
-### 2. GitHub Pages aktivieren
-
-1. Repository Settings → Pages
-2. Branch: `main` → `/ (root)`
-3. Speichern → Live in 1-2 Minuten
-
-### 3. E-Mail-Adresse anpassen
-
-In `index.html` Zeile 162 und `fehler.html` die Kontakt-E-Mail ändern.
-
-## Anpassungen
-
-### Schulen hinzufügen/ändern
-
-In `index.html` Zeile 62-71 die Optionen anpassen:
-
-```html
-<option value="grundschule">Grundschule Kirchlengern</option>
-<option value="andere-schule">Andere Schule</option>
-```
-
-### Gefahrenkategorien ändern
-
-In `index.html` Zeile 84-122 die Checkbox-Gruppe anpassen.
-
-### Design anpassen
-
-In `styles.css` die CSS-Variablen ab Zeile 1:
-
-```css
-:root {
-    --spd-red: #e3000f;      /* Hauptfarbe ändern */
-    --background: #f5f5f5;   /* Hintergrund */
-}
-```
 
 ## Datenschutz
 
 - Keine Daten werden auf Servern gespeichert
-- Formular-Daten gehen direkt an Formspree
-- Fotos werden mitgesendet (optional)
-- Datenschutzerklärung verlinken (Zeile 159 in `index.html`)
+- Alles läuft lokal im Browser
+- PDF wird client-seitig generiert
+- Keine Cookies, kein Tracking
 
 ## Lizenz
 
