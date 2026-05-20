@@ -396,7 +396,12 @@ async function exportKarteAlsBild() {
         const start = startCoords;
         const end = endCoords;
         
-        // Berechne Mittelpunkt
+        if (!start || !end) {
+            resolve();
+            return;
+        }
+        
+        // Berechne Mittelpunkt und Zoom
         const midLat = (start.lat + end.lat) / 2;
         const midLon = (start.lon + end.lon) / 2;
         
@@ -407,45 +412,72 @@ async function exportKarteAlsBild() {
         if (dist > 0.05) zoom = 14;
         if (dist > 0.1) zoom = 13;
         
-        // Erstelle OpenStreetMap Static Map URL
-        // Format: https://staticmap.openstreetmap.de/staticmap.php?center=lat,lon&zoom=z&size=600x400&markers=...
-        const mapUrl = `https://staticmap.openstreetmap.de/staticmap.php?` +
-            `center=${midLat},${midLon}&` +
-            `zoom=${zoom}&` +
-            `size=800x500&` +
-            `maptype=mapnik&` +
-            `markers=${start.lat},${start.lon},ol-marker-green|${end.lat},${end.lon},ol-marker-red`;
+        // Versuche verschiedene Static Map Services
+        const services = [
+            // MapQuest Open (kein API-Key nötig für niedrige Nutzung)
+            `https://www.mapquestapi.com/staticmap/v5/map?` +
+            `key=YOUR_KEY&center=${midLat},${midLon}&zoom=${zoom}&size=800,500&` +
+            `locations=${start.lat},${start.lon}|${end.lat},${end.lon}`,
+            
+            // OpenStreetMap.de Static (einfacher)
+            `https://staticmap.openstreetmap.de/staticmap.php?` +
+            `center=${midLat},${midLon}&zoom=${zoom}&size=800x500&` +
+            `markers=${start.lat},${start.lon},ol-marker-green|${end.lat},${end.lon},ol-marker-red`,
+            
+            // Geoapify (kostenlos bis 3000/Tag)
+            `https://maps.geoapify.com/v1/staticmap?style=osm-carto&` +
+            `width=800&height=500&center=lonlat:${midLon},${midLat}&zoom=${zoom}&` +
+            `marker=lonlat:${start.lon},${start.lat};color:#00aa00|lonlat:${end.lon},${end.lat};color:#aa0000`
+        ];
         
-        // Setze Bild-URL
         const imgElement = document.getElementById('pdf-karte-bild');
-        imgElement.src = mapUrl;
-        imgElement.style.display = 'block';
+        let currentService = 0;
         
-        // Lade-Handling
-        imgElement.onload = function() {
-            console.log('Kartenbild geladen');
-            resolve();
-        };
+        function tryNextService() {
+            if (currentService >= services.length) {
+                // Alle Services fehlgeschlagen - Fallback
+                console.error('Kein Karten-Service verfügbar');
+                imgElement.style.display = 'none';
+                document.getElementById('pdf-karte-container').innerHTML = 
+                    '<div style="padding: 40px; text-align: center; background: #f5f5f5; border-radius: 8px;">' +
+                    '<p><strong>🗺️ Schulweg</strong></p>' +
+                    '<p style="margin-top: 15px;"><b>Von:</b> ' + document.getElementById('start-adresse').value + '</p>' +
+                    '<p><b>Nach:</b> ' + document.getElementById('ziel-adresse').value + '</p>' +
+                    '<p style="margin-top: 15px; font-size: 0.9em; color: #666;">' +
+                    'Koordinaten: ' + start.lat.toFixed(5) + ', ' + start.lon.toFixed(5) + ' → ' +
+                    end.lat.toFixed(5) + ', ' + end.lon.toFixed(5) + '</p>' +
+                    '</div>';
+                resolve();
+                return;
+            }
+            
+            const url = services[currentService];
+            console.log('Versuche Karten-Service', currentService + 1, ':', url);
+            
+            imgElement.src = url;
+            imgElement.style.display = 'block';
+            
+            imgElement.onload = function() {
+                console.log('Kartenbild erfolgreich geladen von Service', currentService + 1);
+                resolve();
+            };
+            
+            imgElement.onerror = function() {
+                console.log('Service', currentService + 1, 'fehlgeschlagen');
+                currentService++;
+                tryNextService();
+            };
+        }
         
-        imgElement.onerror = function() {
-            console.error('Kartenbild konnte nicht geladen werden');
-            // Fallback: Text anzeigen
-            imgElement.style.display = 'none';
-            document.getElementById('pdf-karte-container').innerHTML = 
-                '<div style="padding: 40px; text-align: center; background: #f5f5f5; border-radius: 8px;">' +
-                '<p><strong>Schulweg</strong></p>' +
-                '<p>Von: ' + document.getElementById('start-adresse').value + '</p>' +
-                '<p>Nach: ' + document.getElementById('ziel-adresse').value + '</p>' +
-                '</div>';
-            resolve();
-        };
+        tryNextService();
         
-        // Timeout nach 5 Sekunden
+        // Timeout nach 10 Sekunden
         setTimeout(() => {
-            if (!imgElement.complete) {
+            if (!imgElement.complete || imgElement.naturalWidth === 0) {
+                console.error('Timeout beim Laden der Karte');
                 imgElement.onerror();
             }
-        }, 5000);
+        }, 10000);
     });
 }
 
